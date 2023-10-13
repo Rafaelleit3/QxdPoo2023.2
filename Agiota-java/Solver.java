@@ -1,76 +1,45 @@
-
-import java.lang.ref.Cleaner.Cleanable;
 import java.util.*;
 
-enum Label{
+enum Label {
     GIVE,
     TAKE,
     PLUS;
 
     @Override
-    public String toString(){
-        switch(this.name()){
+    public String toString() {
+        String labelString;
+        switch (this) {
             case GIVE:
-                return "give";
+                labelString = "give";
+                break;
             case TAKE:
-                return "take";
+                labelString = "take";
+                break;
             case PLUS:
-                return "plus";
+                labelString = "plus";
+                break;
             default:
-                return null;
+                labelString = null;
+                break;
         }
+        return labelString;
     }
-    
 }
 
-class Client {
-    private String name;
-    private int limite;
-    ArrayList<Operation> operations;
+class ClienteException extends Exception {
+    private boolean existe;
 
-    public Client(String name, int limite) {
-        this.name = name;
-        this.limite = limite;
-        
+    public ClienteException(boolean existe) {
+        this.existe = existe;
     }
+
     @Override
-    public String toString() {
-        return getName() + " " + getLimite();
-    }
-
-    public String getName() {
-        return this.name;
-    }
-    public int getLimite() {
-        return this.limite;
-    }
-    public ArrayList<Operation> getOperations() {
-        return operations;
-    }
-
-    //XXX public void addOperation(String name, Label label, int value)
-    public void addOperation(Operation operation) {
-        if(operations == null){
-            operations = new ArrayList<>();
+    public String getMessage() {
+        if (!existe) {
+            return "fail: cliente nao existe";
+        } else {
+            return "fail: cliente ja existe";
         }
-        operations.add(operation);
-    }
-    //quanto esta devendo
-    public int getBalance() {
-        int divida = 0;
-        for(Operation operation: operations){
-            if (operation.getLabel().equals("GIVE")) {
-                divida += operation.getValue();
-            }
-            if (operation.getLabel().equals("TAKE")) {
-                divida -= operation.getValue();
-            }
-            if (operation.getLabel().equals("PLUS")) {
-                divida += operation.getValue();
-            }
-        }
-
-        return divida;
     }
 }
 
@@ -81,14 +50,15 @@ class Operation {
     private Label label;
     private int value;
 
-    public Operation( String name, Label label, int value ) {
+    public Operation(String name, Label label, int value) {
         this.id = Operation.nextOpId++;
         this.name = name;
         this.label = label;
         this.value = value;
-        //this.id = Operation.nextOpId;
-        //Operation.nextOpId++;
+        // this.id = Operation.nextOpId;
+        // Operation.nextOpId++;
     }
+
     @Override
     public String toString() {
         return String.format("%s", this.id);
@@ -97,18 +67,81 @@ class Operation {
     public int getId() {
         return this.id;
     }
+
     public String getName() {
         return this.name;
     }
+
     public Label getLabel() {
         return this.label;
     }
+
     public int getValue() {
         return this.value;
     }
 }
 
+class Client {
+    private String name;
+    private int limite;
+    ArrayList<Operation> operations;
 
+    public Client(String name, int limite) {
+        this.name = name;
+        this.limite = limite;
+
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(getName()).append(" ").append(getBalance()).append("/").append(getLimite()).append("\n");
+
+        for (Operation operation : operations) {
+            sb.append("id:").append(operation.getId()).append(" ").append(operation.getLabel()).append(":")
+                    .append(operation.getName()).append(" ").append(operation.getValue()).append("\n");
+        }
+        return sb.toString();
+
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    public int getLimite() {
+        return this.limite;
+    }
+
+    public ArrayList<Operation> getOperations() {
+        return operations;
+    }
+
+    // XXX public void addOperation(String name, Label label, int value)
+    public void addOperation(Operation operation) {
+        if (operations == null) {
+            this.operations = new ArrayList<>();
+        }
+        operations.add(operation);
+    }
+
+    // quanto esta devendo
+    public int getBalance() {
+        int divida = 0;
+        if (operations != null) {
+            for (Operation operation : operations) {
+                Label label = operation.getLabel(); // pegar a etiqueta
+                if (label == Label.TAKE) {
+                    divida -= operation.getValue();
+                } else if (label == Label.GIVE || label == Label.PLUS) {
+                    divida += operation.getValue();
+                }
+            }
+        }
+
+        return divida;
+    }
+}
 
 class Agiota {
     private ArrayList<Client> aliveList;
@@ -116,24 +149,23 @@ class Agiota {
     private ArrayList<Operation> aliveOper;
     private ArrayList<Operation> deathOper;
 
-    private int searchClient(String name) {
-        for(Client client: aliveList){
-            if(client.getName().equals(name)){
-                return client.getLimite();
+    private int searchClient(String name) { // buscar na operação
+        for (int i = 0; i < aliveList.size(); i++) {
+            if (aliveList.get(i).getName().equals(name)) {
+                return i;
             }
         }
-        System.out.println("fail: cliente nao encontrado");
+        // System.out.println("fail: cliente nao encontrado");
         return -1;
     }
-    
-    
+
     private void pushOperation(Client client, Operation operation) {
         client.addOperation(operation);
         aliveOper.add(operation);
     }
 
     private void sortAliveList() {
-        this.aliveList.sort( new Comparator<Client>() {
+        this.aliveList.sort(new Comparator<Client>() {
             public int compare(Client c1, Client c2) {
                 return c1.getName().compareTo(c2.getName());
             }
@@ -145,43 +177,76 @@ class Agiota {
         this.deathList = new ArrayList<>();
         this.aliveOper = new ArrayList<>();
         this.deathOper = new ArrayList<>();
-        
+
     }
 
-    public Client getClient(String name) {
-        for(Client client: aliveList){
-            if(client.getName().equals(name)){
+    public Client getClient(String name) { // buscar na lista
+        for (Client client : aliveList) {
+            if (client.getName().equals(name)) {
                 return client;
             }
         }
-        System.out.println("fail: cliente nao encontrado");
         return null;
     }
 
-    public void addClient(String name, int limite) {
+    public void addClient(String name, int limite) throws Exception {
+        if (searchClient(name) != -1) {
+            // System.out.println("fail: cliente ja existe");
+            throw new ClienteException(true);
+        }
+
         this.aliveList.add(new Client(name, limite));
         this.sortAliveList();
+        // // if(this.aliveList != null){
+        // if(searchClient(name) == -1){
+        // this.aliveList.add(new Client(name, limite));
+        // this.sortAliveList();
+        // }
+        // else{
+        // // System.out.println("fail: cliente ja existe");
+        // throw new Exception("fail: cliente ja existe");
+        // }
+        // // }
     }
 
-    public void give(String name, int value) {
+    public void give(String name, int value) throws Exception {
         Client client = getClient(name);
 
-        if(client != null){
-            Operation operation = new Operation(name, Label.GIVE, value);
-            pushOperation(client, operation);
+        if (client == null) {
+            // throw new Exception("fail: cliente nao existe");
+            throw new ClienteException(false);
         }
-        
+
+        if (value + client.getBalance() > client.getLimite()) {
+            throw new Exception("fail: limite excedido");
+        }
+
+        Operation operation = new Operation(name, Label.GIVE, value);
+        pushOperation(client, operation);
+
+        // if(client != null){
+        // if(value + client.getBalance() > client.getLimite()){
+        // System.out.println("fail: limite excedido");
+        // }
+        // else{
+        // Operation operation = new Operation(name, Label.GIVE, value);
+        // pushOperation(client, operation);
+        // }
+        // } else {
+        // System.out.println("fail: cliente nao existe");
+        // }
     }
 
-    public void take(String name, int value) {
+    public void take(String name, int value) throws Exception {
         Client client = getClient(name);
-        
-        if(client != null){
-            Operation operation = new Operation(name, Label.TAKE, value);
-            pushOperation(client, operation);
+
+        if (client == null) {
+            // throw new Exception("fail: cliente nao existe");
+            throw new ClienteException(false);
         }
 
-
+        Operation operation = new Operation(name, Label.TAKE, value);
+        pushOperation(client, operation);
     }
 
     public void kill(String name) {
@@ -190,43 +255,63 @@ class Agiota {
         this.deathList.add(client);
         this.aliveList.remove(client);
 
+        for (int i = 0; i < aliveOper.size(); i++) { // mover operações para os mortos
+            if (aliveOper.get(i).getName().equals(name)) {
+                deathOper.add(aliveOper.get(i));
+                aliveOper.remove(i);
+                i--;
+            }
+        }
+
     }
 
     public void plus() {
+        ArrayList<Client> paraMatar = new ArrayList<>();
+
         for (Client client : aliveList) {
-            Operation operation = new Operation(client.getName(),Label.PLUS, (client.getBalance() * 10/100));
+            int value = (int) Math.ceil((client.getBalance() * 0.1));
+            Operation operation = new Operation(client.getName(), Label.PLUS, value);
             pushOperation(client, operation);
+
+            if (client.getBalance() > client.getLimite()) {
+                paraMatar.add(client);
+            }
         }
+
+        for (Client client : paraMatar) {
+            kill(client.getName());
+        }
+
     }
 
     @Override
-public String toString() {
-    StringBuilder sb = new StringBuilder();
-    
-    // Listagem dos clientes vivos
-    for (Client client : aliveList) {
-        sb.append(") ").append(client.getName()).append(" ").append(client.getLimite()).append("\n");
-
-        // Listagem das transações do cliente
-        for (Operation operation : client.getOperations()) {
-            sb.append("id:").append(operation.getId()).append(" ").append(operation.getLabel()).append(":")
-                .append(client.getName()).append(" ").append(operation.getValue()).append("\n");
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        // Listagem dos clientes vivos
+        for (Client client : aliveList) {
+            sb.append(":) ").append(client.getName()).append(" ").append(client.getBalance()).append("/")
+                    .append(client.getLimite()).append("\n");
         }
-    }
 
-    // Listagem dos clientes mortos
-    for (Client client : deathList) {
-        sb.append("( ").append(client.getName()).append(" ").append(client.getLimite()).append("\n");
-
-        // Listagem das transações do cliente
-        for (Operation operation : client.getOperations()) {
-            sb.append("id:").append(operation.getId()).append(" ").append(operation.getLabel()).append(":")
-                .append(client.getName()).append(" ").append(operation.getValue()).append("\n");
+        // Listagem de todas as transações dos vivos
+        for (Operation operation : aliveOper) {
+            sb.append("+ id:").append(operation.getId()).append(" ").append(operation.getLabel()).append(":")
+                    .append(operation.getName()).append(" ").append(operation.getValue()).append("\n");
         }
-    }
+        // Listagem dos clientes mortos
+        for (Client client : deathList) {
+            sb.append(":( ").append(client.getName()).append(" ").append(client.getBalance()).append("/")
+                    .append(client.getLimite()).append("\n");
+        }
 
-    return sb.toString();
-}
+        // Listagem de todas as transações dos clientes mortos
+        for (Operation operation : deathOper) {
+            sb.append("- id:").append(operation.getId()).append(" ").append(operation.getLabel()).append(":")
+                    .append(operation.getName()).append(" ").append(operation.getValue()).append("\n");
+        }
+
+        return sb.toString();
+    }
 
 }
 
@@ -238,23 +323,49 @@ public class Solver {
             String line = input();
             println("$" + line);
             String[] args = line.split(" ");
-
-            if      (args[0].equals("end"))     { break; }
-            else if (args[0].equals("init"))    { agiota = new Agiota(); }
-            else if (args[0].equals("show"))    { print(agiota); }
-            else if (args[0].equals("showCli")) { print( agiota.getClient( args[1] ) ); }
-            else if (args[0].equals("addCli"))  { agiota.addClient( args[1], (int) number(args[2]) ); }
-            else if (args[0].equals("give"))    { agiota.give( args[1], (int) number(args[2]) ); }
-            else if (args[0].equals("take"))    { agiota.take( args[1], (int) number(args[2]) ); }
-            else if (args[0].equals("kill"))    { agiota.kill( args[1] ); }
-            else if (args[0].equals("plus"))    { agiota.plus(); }
-            else                                { println("fail: comando invalido"); }
+            try {
+                if (args[0].equals("end")) {
+                    break;
+                } else if (args[0].equals("init")) {
+                    agiota = new Agiota();
+                } else if (args[0].equals("show")) {
+                    print(agiota);
+                } else if (args[0].equals("showCli")) {
+                    print(agiota.getClient(args[1]));
+                } else if (args[0].equals("addCli")) {
+                    agiota.addClient(args[1], (int) number(args[2]));
+                } else if (args[0].equals("give")) {
+                    agiota.give(args[1], (int) number(args[2]));
+                } else if (args[0].equals("take")) {
+                    agiota.take(args[1], (int) number(args[2]));
+                } else if (args[0].equals("kill")) {
+                    agiota.kill(args[1]);
+                } else if (args[0].equals("plus")) {
+                    agiota.plus();
+                } else {
+                    println("fail: comando invalido");
+                }
+            } catch (Exception e) {
+                println(e.getMessage());
+            }
         }
     }
 
     private static Scanner scanner = new Scanner(System.in);
-    private static String  input()                { return scanner.nextLine();        }
-    private static double  number(String value)   { return Double.parseDouble(value); }
-    public  static void    println(Object value)  { System.out.println(value);        }
-    public  static void    print(Object value)    { System.out.print(value);          }
+
+    private static String input() {
+        return scanner.nextLine();
+    }
+
+    private static double number(String value) {
+        return Double.parseDouble(value);
+    }
+
+    public static void println(Object value) {
+        System.out.println(value);
+    }
+
+    public static void print(Object value) {
+        System.out.print(value);
+    }
 }
